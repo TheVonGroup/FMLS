@@ -8,12 +8,7 @@ require('dotenv').config();
 const app = express();
 const port = 4000;
 
-const { join } = require('path');
 
-module.exports = {
-  // Changes the cache location for Puppeteer.
-  cacheDirectory: join(__dirname, '.cache', 'puppeteer'),
-};
 
 
 
@@ -40,7 +35,7 @@ app.get('/', (req, res) => {
     const fetch = async () => {
         console.log("Starting")
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             defaultViewport: null,
             args: ['--start-maximized']
         });
@@ -64,7 +59,6 @@ app.get('/', (req, res) => {
     
         await page.goto("https://firstmls.com/", {
             waitUntil: "domcontentloaded",
-            headless: false,
         });
     
         //Xpaths for FMLS
@@ -218,7 +212,7 @@ app.get('/', (req, res) => {
                 await MLSofListingsXpath.click();
             }
             for (let index = 0; index < totalNumofLists; index++) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 4000));
                 await page.waitForSelector(getCurrListNum);
                 await page.waitForSelector(clickSellerInfo);
                 const getCurrListNumXpath = await page.$(getCurrListNum);
