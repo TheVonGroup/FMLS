@@ -18,14 +18,14 @@ async function readCsvAndExtractMlsNumbers(filePath, targetMlsNumber) {
             .pipe(csv())
             .on('data', (row) => {
                 if (row['MLS#'] === targetMlsNumber) {
-                    resolve(row); 
+                    resolve(row);
                 }
             })
             .on('end', () => {
                 reject(new Error('MLS number not found'));
             })
             .on('error', (err) => {
-                reject(err); 
+                reject(err);
             });
     });
 }
@@ -35,7 +35,7 @@ app.get('/', (req, res) => {
     const fetch = async () => {
         console.log("Starting")
         const browser = await puppeteer.launch({
-            headless: true,
+            headless: false,
             defaultViewport: null,
             args: ['--start-maximized']
         });
@@ -43,7 +43,7 @@ app.get('/', (req, res) => {
             keyFile: "credentials.json",
             scopes: "https://www.googleapis.com/auth/spreadsheets",
         });
-    
+
         const client = await auth.getClient();
         const googleSheets = google.sheets({ version: "v4", auth: client });
         const spreadsheetId = process.env.SPREADSHEET_ID;
@@ -55,12 +55,12 @@ app.get('/', (req, res) => {
             behavior: 'allow',
             downloadPath: downloadPath
         });
-    
-    
+
+
         await page.goto("https://firstmls.com/", {
             waitUntil: "domcontentloaded",
         });
-    
+
         //Xpaths for FMLS
         const loginButton = '#top-menu > li.menu_cta.menu-item.menu-item-type-custom.menu-item-object-custom.menu-item-872 > a';
         const userNameBtn = 'input.form-control.form__input-control:nth-child(2)'
@@ -88,19 +88,20 @@ app.get('/', (req, res) => {
         const nextPage = '#m_upPaging > span > a:nth-child(11)'
         let totalNumofLists = 0;
         let currListNum = 0;
-    
+        let SellerFlag = true;
+
         await page.waitForSelector(loginButton)
         const loginButtonXpath = await page.$(loginButton);
         try {
             if (loginButtonXpath) {
                 await loginButtonXpath.click();
             }
-    
+
             await page.waitForSelector(userNameBtn)
             await page.waitForSelector(passBtn)
             await page.waitForSelector(submitBtn)
-    
-    
+
+
             const userNameBtnXpath = await page.$(userNameBtn);
             const passBtnXpath = await page.$(passBtn);
             const submitBtnXpath = await page.$(submitBtn);
@@ -129,7 +130,7 @@ app.get('/', (req, res) => {
             //////
             await new Promise(resolve => setTimeout(resolve, 13000));
             await page.goto('https://matrix.fmlsd.mlsmatrix.com/Matrix/Search/Residential', { waitUntil: "domcontentloaded", });
-    
+
             await page.waitForSelector(unselectAllCheckBoxes);
             const unselectCheckBoxesXpath = await page.$(unselectAllCheckBoxes);
             if (unselectCheckBoxesXpath) {
@@ -140,7 +141,7 @@ app.get('/', (req, res) => {
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 await unselectCheckBoxesXpath.click();
             }
-    
+
             await page.waitForSelector(checkBoxes);
             await page.waitForSelector(textBoxes);
             const checkBoxesXpath = await page.$$(checkBoxes);
@@ -166,7 +167,7 @@ app.get('/', (req, res) => {
                 await textBoxesXpath[4].evaluate(textBoxesXpath => textBoxesXpath.value = '0-1')
                 await textBoxesXpath[8].evaluate(textBoxesXpath => textBoxesXpath.value = '0-1')
             }
-    
+
             if (resultXpath) {
                 await resultXpath.click();
             }
@@ -175,7 +176,7 @@ app.get('/', (req, res) => {
             await page.waitForSelector(exportButton);
             await page.waitForSelector(totalListings);
             const totalListingsXpath = await page.$(totalListings);
-    
+
             if (totalListingsXpath) {
                 let text1 = await page.evaluate(element => element.innerText, totalListingsXpath);
                 totalNumofLists = Number(text1);
@@ -184,9 +185,7 @@ app.get('/', (req, res) => {
             const exportButtonXpath = await page.$(exportButton);
             if (pageNumSelector) {
                 await selectAllListingsXpath.click();
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await page.select('select[id="m_ucDisplayPicker_m_ddlPageSize"]', '100');
-                await new Promise(resolve => setTimeout(resolve, 10000));
+                await new Promise(resolve => setTimeout(resolve, 5000));
                 await exportButtonXpath.click();
                 await new Promise(resolve => setTimeout(resolve, 10000));
                 await page.select('select[id="m_ddExport"]', 'ud39051');
@@ -205,7 +204,7 @@ app.get('/', (req, res) => {
                 await goBackXpath.click();
             }
             await new Promise(resolve => setTimeout(resolve, 10000));
-    
+
             const filePath = path.join(__dirname, 'downloads', 'Agent Autopilot.csv');
             await page.waitForSelector(MLSofListings);
             const MLSofListingsXpath = await page.$(MLSofListings);
@@ -213,11 +212,12 @@ app.get('/', (req, res) => {
                 await MLSofListingsXpath.click();
             }
             for (let index = 0; index < totalNumofLists; index++) {
+                SellerFlag = true;
                 await new Promise(resolve => setTimeout(resolve, 4000));
                 await page.waitForSelector(getCurrListNum);
-                await page.waitForSelector(clickSellerInfo);
+                // await page.waitForSelector(clickSellerInfo);
                 const getCurrListNumXpath = await page.$(getCurrListNum);
-                const clickSellerInfoXpath = await page.$(clickSellerInfo);
+                // const clickSellerInfoXpath = await page.$(clickSellerInfo);
                 if (getCurrListNumXpath) {
                     let text = await page.evaluate(element => element.innerText, getCurrListNumXpath);
                     currListNum = text;
@@ -226,43 +226,70 @@ app.get('/', (req, res) => {
                 }
                 console.log("Current List : " + currListNum);
                 await new Promise(resolve => setTimeout(resolve, 5000));
-                if (clickSellerInfoXpath) {
-                    await clickSellerInfoXpath.click();
+                const clickLinkIfNotEmpty = async (selector) => {
+                    const link = await page.$(selector);
+                    if (!link) {
+                        SellerFlag = false;
+                        throw new Error('Link not found');
+                    }
+
+                    const linkText = await page.evaluate(el => el.textContent.trim(), link);
+                    if (linkText === '') {
+                        SellerFlag = false;
+                        throw new Error('Link is empty');   
+                    }
+                    if (SellerFlag) {
+                        await link.click()
+                    }
+
+                    
+                };
+
+                // Example usage: Click a link inside the container with class "elements"
+                try {
+                    await clickLinkIfNotEmpty(clickSellerInfo);
+                } catch (error) {
+                    console.log("Error : " + error);
                 }
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                const pages = await browser.pages();
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                let currSellerEmail = '';
+                if (SellerFlag) {
+                    const pages = await browser.pages();
     
-                // Switch to the last tab (the newly opened tab)
-                const lastPage = pages[pages.length - 1];
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                    // Switch to the last tab (the newly opened tab)
+                    const lastPage = pages[pages.length - 1];
+                    await new Promise(resolve => setTimeout(resolve, 5000));
     
-                await lastPage.waitForSelector(getSellerEmail);
-                const getSellerEmailXpath = await lastPage.$(getSellerEmail);
-                await lastPage.waitForSelector(closeBtn);
-                const closeBtnXpath = await lastPage.$(closeBtn);
+                    await lastPage.waitForSelector(getSellerEmail);
+                    const getSellerEmailXpath = await lastPage.$(getSellerEmail);
+                    await lastPage.waitForSelector(closeBtn);
+                    const closeBtnXpath = await lastPage.$(closeBtn);
     
-                let currSellerEmail = ''; 
-                currSellerEmail = await lastPage.evaluate((getSellerEmailXpath) => {
-                    if (getSellerEmailXpath) {
-                        return getSellerEmailXpath.innerText; 
-                    } else {
-                        console.log('Could not get Seller"s email');
-                        return '';
-                    }
-                }, getSellerEmailXpath);
-                console.log("Curr Seller Email: " + currSellerEmail);
+                    currSellerEmail = '';
+                    currSellerEmail = await lastPage.evaluate((getSellerEmailXpath) => {
+                        if (getSellerEmailXpath) {
+                            return getSellerEmailXpath.innerText;
+                        } else {
+                            console.log('Could not get Seller"s email');
+                            return '';
+                        }
+                    }, getSellerEmailXpath);
+                    console.log("Curr Seller Email: " + currSellerEmail);
     
-                await lastPage.evaluate((closeBtnXpath) => {
-                    if (closeBtnXpath) {
-                        closeBtnXpath.click()
-                    } else {
-                        console.log('Could not get Seller"s email');
-                    }
-                }, closeBtnXpath);
-    
+                    await lastPage.evaluate((closeBtnXpath) => {
+                        if (closeBtnXpath) {
+                            closeBtnXpath.click()
+                        } else {
+                            console.log('Could not get Seller"s email');
+                        }
+                    }, closeBtnXpath);
+                }
+               
+
                 await new Promise(resolve => setTimeout(resolve, 4000));
-    
-    
+
+
                 readCsvAndExtractMlsNumbers(filePath, currListNum)
                     .then(row => {
                         let mlsNumber = row['MLS#'];
@@ -278,7 +305,7 @@ app.get('/', (req, res) => {
                         if (!sellingAgentFullName || !sellingAgentDirectWorkPhone) {
                             throw new Error('Selling Agent Full Name or Direct Work Phone is missing');
                         }
-    
+
                         googleSheets.spreadsheets.values.append({
                             auth,
                             spreadsheetId,
@@ -293,7 +320,7 @@ app.get('/', (req, res) => {
                                         listAgentFullName,
                                         listAgentDirectWorkPhone,
                                         sellingAgentFullName,
-                                        currSellerEmail, 
+                                        currSellerEmail,
                                         sellingAgentDirectWorkPhone,
                                     ]
                                 ]
@@ -309,25 +336,25 @@ app.get('/', (req, res) => {
                     .catch(err => {
                         console.error('Error:', err.message);
                     });
-    
+
                 await new Promise(resolve => setTimeout(resolve, 4000));
                 await page.waitForSelector(nextPage);
                 const nextPageXpath = await page.$(nextPage);
                 if (nextPageXpath) {
                     await nextPageXpath.click()
                 }
-    
+
             }
-            
+
             await browser.close();
             res.send('Done');
             process.exit();
-            
+
         } catch (error) {
             console.log(error)
         }
     }
-    
+
     fetch();
 })
 
