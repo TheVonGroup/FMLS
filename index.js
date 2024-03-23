@@ -211,8 +211,7 @@ app.get('/', (req, res) => {
                 await MLSofListingsXpath.click();
             }
             for (let index = 0; index < totalNumofLists; index++) {
-                console.log("Total lists " + totalNumofLists);
-                await new Promise(resolve => setTimeout(resolve, 4000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 await page.waitForXPath(getCurrListNum);
                 await page.waitForXPath(clickSellerInfo);
                 const getCurrListNumXpath = await page.$x(getCurrListNum);
