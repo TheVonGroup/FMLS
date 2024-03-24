@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build": "./render-build.sh"
+    "build": "npm install"
   },
   "author": "",
   "license": "ISC",
