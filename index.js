@@ -29,9 +29,10 @@ async function readCsvAndExtractMlsNumbers(filePath, targetMlsNumber) {
             });
     });
 }
-
+console.log("Hello Outside GET")
 
 app.get('/', (req, res) => {
+    console.log("Hello in GET")
     const fetch = async () => {
         console.log("Starting")
         const browser = await puppeteer.launch({
