@@ -29,11 +29,9 @@ async function readCsvAndExtractMlsNumbers(filePath, targetMlsNumber) {
             });
     });
 }
-console.log("Hello Outside GET")
 
-console.log("Hello in GET")
 const fetch = async () => {
-    console.log("Starting")
+    console.log("Starting Scrapper")
     const browser = await puppeteer.launch({
         headless: false,
         defaultViewport: null,
@@ -60,6 +58,8 @@ const fetch = async () => {
     await page.goto("https://firstmls.com/", {
         waitUntil: "domcontentloaded",
     });
+
+    console.log("Execution Going on")
 
     //Xpaths for FMLS
     const loginButton = '#top-menu > li.menu_cta.menu-item.menu-item-type-custom.menu-item-object-custom.menu-item-872 > a';
@@ -355,7 +355,10 @@ const fetch = async () => {
     }
 }
 
-fetch();
+app.get('/', (req, res) => {
+    console.log("GET api called")
+    fetch();
+});
 
 
 
