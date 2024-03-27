@@ -355,10 +355,8 @@ const fetch = async () => {
     }
 }
 
-app.get('/', (req, res) => {
-    console.log("GET api called")
-    fetch();
-});
+
+fetch();
 
 
 
